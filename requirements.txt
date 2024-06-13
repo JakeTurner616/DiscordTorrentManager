@@ -1,0 +1,10 @@
+flask[async]
+selenium
+bs4
+webdriver-manager
+python-qbittorrent
+configparser
+discord.py
+humanize
+
+git+https://github.com/Pycord-Development/pycord#egg=py-cord
