@@ -1,3 +1,4 @@
+import sys
 import discord
 from discord import Option, ApplicationContext
 from discord.ext import commands
@@ -6,6 +7,10 @@ import configparser
 from qbittorrent import Client
 import asyncio
 import humanize
+import subprocess
+import platform
+import time
+import os
 
 # Read config
 config = configparser.ConfigParser()
@@ -31,11 +36,36 @@ download_in_progress = False
 
 emoji_list = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣']  # List of emojis for reactions
 
+def is_server_running(url):
+    try:
+        response = requests.get(url)
+        return response.status_code == 200
+    except requests.exceptions.ConnectionError:
+        return False
+
+API_URL = 'http://127.0.0.1:5000'
+if not is_server_running(API_URL):
+    print("Server is not running. Starting app.py...")
+    current_directory = os.path.dirname(os.path.abspath(__file__))
+    python_executable = sys.executable
+    script_path = os.path.join(os.path.dirname(__file__), "app.py")
+
+    # Check if the server is running and start it if not
+    if not is_server_running('http://127.0.0.1:5000'):
+        print("Server is not running. Starting app.py...")
+        subprocess.Popen(['venv/scripts/python', 'app.py'])
+        time.sleep(5)
+    else:
+        print("Server is already running.")
+    
+else:
+    print("Server is already running.")
+
 @bot.slash_command(name="magnet", description="Download a torrent from a magnet link.", guild_ids=[guild_id])
 async def magnet(ctx: ApplicationContext,
                  magnet_link: Option(str, "Specify the magnet link.", required=True), # type: ignore
                  category: Option(str, "Specify the download category.", required=True, choices=["TV", "Movie", "FitGirl Repack"])): # type: ignore
-    
+
     global download_in_progress
     download_in_progress = True
     empty_response_counter = 0
