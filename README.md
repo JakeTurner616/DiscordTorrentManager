@@ -48,6 +48,15 @@ This program consists of a bot scirpt and a search wrapper. these two parts work
     ```bash
     python bot.py
     ```
+    If you run into this error: `ImportError: cannot import name 'Option' from 'discord'`, just run these commands:
+    
+    ```bash
+    pip uninstall discord -y
+    pip uninstall py-cord -y
+    pip install discord
+    pip install py-cord
+    pip uninstall discord -y
+    ```
 
 ## qBittorrent Setup
 
