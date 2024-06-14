@@ -3,6 +3,9 @@
 Torrent seeker and manager that you can use with your friends 
 
 
+![magnet link demo](https://github.com/JakeTurner616/DiscordTorrentManager/blob/main/docs/moviebotdemo.gif)
+
+
 > [!NOTE]
 > The [initial](https://github.com/JakeTurner616/DiscordMovieBot) version of this project faced significant issues with maintainability and scope. This is the second iteration and aims to have a clearer scope and improved testability so it can be easily maintained and improved.
 
