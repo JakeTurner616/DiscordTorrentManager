@@ -68,12 +68,12 @@ This program consists of a bot scirpt and a search wrapper. these two parts work
 2. Navigate to the `Web UI` section under the `Web UI` tab.
 
 3. Check the `Enable the Web User Interface (Remote control)` box.
+   
+5. Set a network interface to bind the webui in the `IP Address` text box.
 
-4. Set a username and password for the Web UI or setup whitelist rules.
+6. Set a username and password for the Web UI.
 
-5. Note the IP address and port number where the Web UI will be accessible (e.g., `http://10.0.0.153:8080`).
-
-6. Create torrent categories in qBittorrent to associate the downloaded content with the folders they should be saved to (for example: movies > Z://some/location/movies, tv > Z://some/location/tv). These are to be used with /magnet. (/magnet <magnet_link> <category>) These could be set somwhere that has access to a media player like plex, jellyfin, or anything really.
+7. Create torrent categories in qBittorrent to associate the downloaded content with the folders they should be saved to (for example: movies > Z://some/location/movies, tv > Z://some/location/tv). These are to be used with `/magnet <magnet_link> <category>` The category save paths could be set somwhere that has access to a media player like plex, jellyfin, or anything really.
 
 ## Discord Bot Setup
 
