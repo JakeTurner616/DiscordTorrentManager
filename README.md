@@ -79,11 +79,9 @@ This program consists of a bot scirpt and a search wrapper. these two parts work
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and create a new bot application.
 
-2. Navigate to the `Bot` section and create a new bot.
+2. Create and copy the bot token.
 
-3. Create and copy the bot token.
-
-4. Invite the bot to your server using the OAuth2 URL Generator under the `OAuth2` tab. Make sure to give the bot the necessary permissions.
+3. Invite the bot to your server using the OAuth2 URL Generator under the `OAuth2` tab. Make sure to give the bot the necessary permissions for slash commands, reactions, and text.
 
 ## Configuration
 
@@ -98,7 +96,7 @@ guild_id = YOUR_DISCORD_GUILD_ID
 
 [qbit]
 # change to your qBittorrent host and port:  http://host_ip:port 
-host = http://10.0.0.153:8080
+host = http://10.0.0.123:8080
 # qBittorrent WebUI login credentials
 user = YOUR_QBITTORRENT_USERNAME
 pass = YOUR_QBITTORRENT_PASSWORD
