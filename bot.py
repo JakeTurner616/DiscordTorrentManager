@@ -17,7 +17,7 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 
 bot_token = config.get('Bot', 'token')
-guild_id = config.getint('Bot', 'guild_id')
+guild_ids = [int(gid.strip()) for gid in config.get('Bot', 'guild_id').split(',')]
 
 qb_host = config.get('qbit', 'host')
 qb_user = config.get('qbit', 'user')
@@ -61,7 +61,7 @@ if not is_server_running(API_URL):
 else:
     print("Server is already running.")
 
-@bot.slash_command(name="magnet", description="Download a torrent from a magnet link.", guild_ids=[guild_id])
+@bot.slash_command(name="magnet", description="Download a torrent from a magnet link.", guild_ids=guild_ids)
 async def magnet(ctx: ApplicationContext,
                  magnet_link: Option(str, "Specify the magnet link.", required=True), # type: ignore
                  category: Option(str, "Specify the download category.", required=True, choices=["TV", "Movie", "FitGirl Repack"])): # type: ignore
@@ -153,7 +153,7 @@ async def magnet(ctx: ApplicationContext,
         await ctx.send(embed=error_embed)
         download_in_progress = False
 
-@bot.slash_command(name="search", description="Search for torrents.", guild_ids=[guild_id])
+@bot.slash_command(name="search", description="Search for torrents.", guild_ids=guild_ids)
 async def search(ctx: ApplicationContext, query: Option(str, "Specify the search query.", required=True)): # type: ignore
     embed = discord.Embed(
         title="Search Initiated",
@@ -319,4 +319,5 @@ async def logout_command(ctx):
         )
         await ctx.send(embed=error_embed)
 
+print("running bot")
 bot.run(bot_token)
