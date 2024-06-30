@@ -1,10 +1,11 @@
 flask[async]
-selenium
-bs4
-webdriver-manager
+beautifulsoup4
+requests
 python-qbittorrent
 configparser
 discord.py
 humanize
+gunicorn
 
+# Pycord for Discord bot development
 git+https://github.com/Pycord-Development/pycord#egg=py-cord
