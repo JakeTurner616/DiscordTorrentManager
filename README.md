@@ -1,17 +1,12 @@
 # DiscordTorrentManager 🎬
 
-Torrent seeker and manager that you can use with your friends 
-
+Connect your seedbox to your discord server.
 
 ![magnet link demo](https://github.com/JakeTurner616/DiscordTorrentManager/blob/main/docs/moviebotdemo.gif)
 
+This program enhances a Discord server by integrating torrent searching and downloading functionalities through the qBittorrent API. 🤯
 
-> [!NOTE]
-> The [initial](https://github.com/JakeTurner616/DiscordMovieBot) version of this project faced significant issues with maintainability and scope. This is the second iteration and aims to have a clearer scope and improved testability so it can be easily maintained and improved.
-
-This program consists of a bot scirpt and a search wrapper. these two parts work together to find torrents and add magnets to qbittorrent.
-
-# Installation
+# 🌟 Installation
 
 1. **Clone the repository:**
 
@@ -61,7 +56,7 @@ This program consists of a bot scirpt and a search wrapper. these two parts work
     pip uninstall discord -y
     ```
 
-## qBittorrent Setup
+## ⚙️ qBittorrent Setup
 
 1. Open qBittorrent and go to `Tools` -> `Options`.
 
@@ -75,7 +70,7 @@ This program consists of a bot scirpt and a search wrapper. these two parts work
 
 7. Create torrent categories in qBittorrent to associate the downloaded content with the folders they should be saved to (for example: movies > Z://some/location/movies, tv > Z://some/location/tv). These are to be used with `/magnet <magnet_link> <category>` The category save paths could be set somwhere that has access to a media player like plex, jellyfin, or anything really.
 
-## Discord Bot Setup
+## ⚙️ Discord Bot Setup
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and create a new bot application.
 
@@ -83,7 +78,7 @@ This program consists of a bot scirpt and a search wrapper. these two parts work
 
 3. Invite the bot to your server using the OAuth2 URL Generator under the `OAuth2` tab. Make sure to give the bot the necessary permissions for slash commands, reactions, and text.
 
-## Configuration
+## ⚙️ Configuration
 
 Edit the `config.ini` file to include your specific environment settings for connecting to your discord bot and qBittorrent instance:
 
@@ -104,7 +99,7 @@ pass = YOUR_QBITTORRENT_PASSWORD
 
 The bot can then be started by running the `bot.py` script.
 
-## Command Usage
+## 🤖 Command Usage
 
 Here are the commands included with the DiscordTorrentManager bot:
 
