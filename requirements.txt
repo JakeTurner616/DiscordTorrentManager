@@ -9,3 +9,4 @@ gunicorn
 
 # Pycord for Discord bot development
 git+https://github.com/Pycord-Development/pycord#egg=py-cord
+

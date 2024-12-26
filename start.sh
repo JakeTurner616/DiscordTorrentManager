@@ -5,7 +5,7 @@
 # and then starts the Discord bot. This ensures that both components run in sequence
 # within the same container.
 
-# Use this script as the entrypoint in the Dockerfile, or run it directly on a linux seedbox.
+# Use this script as the entrypoint in the Dockerfile
 
 # Start the backend (Flask app)
 echo "Starting Flask backend..."
