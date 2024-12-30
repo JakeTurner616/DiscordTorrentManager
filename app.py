@@ -6,6 +6,7 @@ This backend provides endpoints for:
 2. Interfacing with qBittorrent Web API to fetch and manage torrents.
 """
 
+import time
 from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
@@ -73,6 +74,8 @@ app = Flask(__name__)
 
 # -------- HELPER FUNCTIONS -------- #
 
+
+# If bitsearch.to fully dies I will rewrite the search function to use a different website
 def scrape_website(search_query):
     """
     Scrapes the torrent website for results matching the search query.
@@ -85,12 +88,22 @@ def scrape_website(search_query):
     """
     logger.info("Starting scrape for query: %s", search_query)
     url = f"https://bitsearch.to/search?q={search_query}&category=1&subcat=2"
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        logger.error("Error fetching URL %s: %s", url, e)
-        return []
+    attempts = 3
+    response = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            logger.info("Attempt %d of %d for URL: %s", attempt, attempts, url)
+            response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+            response.raise_for_status()  # Raise an exception for HTTP errors
+            break  # Exit the loop if the request is successful
+        except requests.RequestException as e:
+            logger.error("Attempt %d failed for URL %s: %s", attempt, url, e)
+            if attempt < attempts:
+                time.sleep(1)  # Wait 1 second before retrying
+            else:
+                logger.error("All %d attempts failed. Returning empty result.", attempts)
+                return []  # Return an empty list if all attempts fail
 
     # Parse the response with BeautifulSoup
     soup = BeautifulSoup(response.content, 'html.parser')
@@ -127,6 +140,7 @@ def scrape_website(search_query):
 
     logger.info("Scraping complete. Found %d results.", len(results))
     return results
+
 
 # -------- API ENDPOINTS -------- #
 
@@ -167,12 +181,32 @@ def get_filtered_torrents():
         filters = {'filter': 'downloading', 'sort': 'time_active', 'limit': 10, 'offset': 0}
         torrent_list = qb.torrents(**filters)
 
-        if isinstance(torrent_list, list) and torrent_list:
-            logger.info("Found %d active torrents.", len(torrent_list))
+        # Cache the last torrent count and time to avoid repetitive logs
+        if not hasattr(get_filtered_torrents, "last_torrent_count"):
+            get_filtered_torrents.last_torrent_count = None
+        if not hasattr(get_filtered_torrents, "last_log_time"):
+            get_filtered_torrents.last_log_time = 0
+
+        current_time = time.time()
+        log_interval = 60  # Log summary every 60 seconds
+
+        if isinstance(torrent_list, list):
+            active_torrent_count = len(torrent_list)
+            
+            # Log only if the count changes or the log interval has passed
+            if (active_torrent_count != get_filtered_torrents.last_torrent_count or
+                current_time - get_filtered_torrents.last_log_time > log_interval):
+                
+                get_filtered_torrents.last_log_time = current_time
+                get_filtered_torrents.last_torrent_count = active_torrent_count
+                
+                if active_torrent_count > 0:
+                    logger.info("Currently %d active torrents.", active_torrent_count)
+                else:
+                    logger.info("No active torrents currently downloading.")
+
             return jsonify(torrent_list), 200
-        elif isinstance(torrent_list, list):
-            logger.info("No torrents found matching the criteria.")
-            return jsonify({"message": "No torrents found matching the criteria."}), 200
+
         else:
             logger.error("Unexpected response from qBittorrent API.")
             return jsonify({"error": "Unexpected response from qBittorrent API"}), 500
@@ -181,7 +215,12 @@ def get_filtered_torrents():
         logger.error("An unexpected error occurred: %s", e)
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
+
 # -------- MAIN -------- #
 
-if __name__ != '__main__':
+if __name__ == '__main__':
+    logger.info("Running directly with Flask development server.")
+    app.run(host='0.0.0.0', port=5000, debug=True)  # Use Flask's built-in server
+else:
+    logger.info("Running with gunicorn deployment server.")
     logger.info("Gunicorn entry point detected, Backend is up and ready to go.")

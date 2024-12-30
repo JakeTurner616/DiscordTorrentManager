@@ -43,8 +43,8 @@ COPY . .
 # Activate virtual environment for the container runtime
 ENV PATH="/app/venv/bin:$PATH"
 
-# Expose the Flask port
-EXPOSE 5000
+# Expose the Flask port if you want but its not needed
+#EXPOSE 5000
 
 # Ensure the start.sh script is executable
 RUN chmod +x start.sh

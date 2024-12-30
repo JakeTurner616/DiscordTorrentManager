@@ -9,7 +9,7 @@
 
 # Start the backend (Flask app)
 echo "Starting Flask backend..."
-gunicorn app:app --bind 127.0.0.1:5000 --timeout 200 --workers 1 &
+gunicorn app:app --bind 0.0.0.0:5000 --timeout 200 --workers 1 &
 
 # Wait for the backend to initialize fully
 sleep 4

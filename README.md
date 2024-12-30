@@ -29,12 +29,12 @@ This program enhances a Discord server by integrating torrent searching and down
 
     ### Linux/macOS (Bash or Zsh)
     ```bash
-    docker run -d --name discordtorrentmanager -v $(pwd)/config.ini:/app/config.ini -p 5000:5000 discordtorrentmanager
+    docker run -d --name discordtorrentmanager -v $(pwd)/config.ini:/app/config.ini discordtorrentmanager
     ```
 
     ### Windows (PowerShell)
     ```powershell
-    docker run -d --name discordtorrentmanager -v ${PWD}/config.ini:/app/config.ini -p 5000:5000 discordtorrentmanager
+    docker run -d --name discordtorrentmanager -v ${PWD}/config.ini:/app/config.ini discordtorrentmanager
     ```
 
 
@@ -128,7 +128,7 @@ token = YOUR_DISCORD_BOT_TOKEN
 guild_id = YOUR_DISCORD_GUILD_ID
 
 [qbit]
-# change to your qBittorrent host and port:  http://host_ip:port 
+# change to your qBittorrent host and port: http://host_ip:port 
 host = http://host_ip:port
 # qBittorrent WebUI login credentials
 user = YOUR_QBITTORRENT_USERNAME
