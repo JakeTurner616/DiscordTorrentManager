@@ -2,7 +2,7 @@
 
 Connect your seedbox to your discord server.
 
-![magnet link demo](https://github.com/JakeTurner616/DiscordTorrentManager/blob/main/docs/moviebotdemo.gif)
+![magnet link demo](https://raw.githubusercontent.com/JakeTurner616/DiscordTorrentManager/refs/heads/main/docs/moviebotdemo.gif)
 
 This program enhances a Discord server by integrating torrent searching and downloading functionalities through the qBittorrent API. 🤯
 
