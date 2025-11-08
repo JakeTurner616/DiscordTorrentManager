@@ -17,15 +17,13 @@ from discord import Option, ApplicationContext
 from discord.ext import commands
 import requests
 import configparser
-from qbittorrent import Client
 import asyncio
 import humanize
 import logging
-import os
 from requests.exceptions import ConnectionError
 from qbittorrent.client import LoginRequired
 
-# -------- CONFIGURATION SETUP -------- #
+# -------- CONFIGURATION -------- #
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,16 +41,15 @@ try:
     qb_host = config.get("qbit", "host")
     qb_user = config.get("qbit", "user")
     qb_pass = config.get("qbit", "pass")
-
     guild_ids = [int(g.strip()) for g in raw_guild_ids.split(",")]
 except Exception as e:
     logger.error("Configuration error: %s", e)
     sys.exit(1)
 
-# -------- SESSION-BASED CLIENT WRAPPER -------- #
+# -------- QBITTORRENT SESSION -------- #
 
 class QbitSession:
-    """Cookie-based qBittorrent session manager to maintain auth persistently."""
+    """Persistent cookie-based qBittorrent session."""
     def __init__(self, host, user, password):
         self.host = host.rstrip("/")
         self.user = user
@@ -65,52 +62,49 @@ class QbitSession:
         })
 
     def login(self):
-        """Explicitly log in and store the SID cookie."""
         try:
-            resp = self.session.post(
+            r = self.session.post(
                 f"{self.host}/api/v2/auth/login",
                 data={"username": self.user, "password": self.password},
                 timeout=10
             )
-            if resp.status_code == 200:
-                logger.info("Authenticated with qBittorrent Web API.")
+            if r.status_code == 200:
+                logger.info("Authenticated with qBittorrent.")
             else:
-                logger.error("Failed qBittorrent login: %s %s", resp.status_code, resp.text)
+                logger.error("Login failed: %s %s", r.status_code, r.text)
         except Exception as e:
             logger.error("Login exception: %s", e)
 
     def ensure(self):
-        """Ensure the session is still valid; relog if needed."""
         try:
-            test = self.session.get(f"{self.host}/api/v2/app/version", timeout=5)
-            if test.status_code != 200:
+            r = self.session.get(f"{self.host}/api/v2/app/version", timeout=5)
+            if r.status_code != 200:
                 self.login()
         except Exception:
             self.login()
 
     def download(self, magnet, category):
-        """Add a torrent via magnet link."""
+        """Add a torrent via magnet link with proper category."""
         self.ensure()
         try:
-            resp = self.session.post(
+            r = self.session.post(
                 f"{self.host}/api/v2/torrents/add",
                 data={"urls": magnet, "category": category.lower()},
                 timeout=10
             )
-            if resp.status_code == 200:
-                logger.info("Torrent added successfully.")
+            if r.status_code == 200:
+                logger.info("Torrent added to qBittorrent under %s", category)
             else:
-                logger.error("Failed to add torrent: %s %s", resp.status_code, resp.text)
+                logger.error("Add failed: %s %s", r.status_code, r.text)
         except Exception as e:
-            logger.error("Error sending torrent: %s", e)
+            logger.error("Send error: %s", e)
 
-
-# -------- INIT SESSION -------- #
+# -------- INIT -------- #
 
 qbit = QbitSession(qb_host, qb_user, qb_pass)
 qbit.login()
 
-# -------- DISCORD BOT SETUP -------- #
+# -------- DISCORD BOT -------- #
 
 intents = discord.Intents.default()
 intents.reactions = True
@@ -119,109 +113,182 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 bot.remove_command("help")
 
-download_in_progress = False
 emoji_list = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣']
 API_URL = 'http://127.0.0.1:5000'
+
+# -------- PROGRESS HANDLER -------- #
+
+async def handle_magnet_download(channel, magnet_link, category):
+    """Handles live torrent progress embed for a given magnet link."""
+    info_url = f"{API_URL}/infoglobal"
+
+    try:
+        qbit.download(magnet_link, category)
+        start_embed = discord.Embed(
+            title="Torrent Added",
+            description=f"Category: **{category}**\nFetching progress...",
+            color=discord.Color.green()
+        )
+        await channel.send(embed=start_embed)
+
+        progress_embed = discord.Embed(
+            title="Torrent Download in Progress",
+            description=f"Magnet: `{magnet_link[:50]}...`",
+            color=discord.Color.blurple()
+        )
+        msg = await channel.send(embed=progress_embed)
+
+        while True:
+            try:
+                resp = requests.get(info_url, timeout=10)
+                torrents = resp.json()
+            except Exception as e:
+                logger.error("infoglobal fetch failed: %s", e)
+                await asyncio.sleep(5)
+                continue
+
+            if not torrents:
+                await asyncio.sleep(5)
+                continue
+
+            t = torrents[0]
+            state = t.get("state", "Unknown")
+            size = t.get("size", 0)
+            downloaded = t.get("downloaded", 0)
+            eta = t.get("eta", 0)
+            dlspeed = t.get("dlspeed", 0)
+            seeds = t.get("num_seeds", 0)
+            leeches = t.get("num_leechs", 0)
+
+            pct = (downloaded / size * 100) if size else 0
+            eta_str = humanize.naturaldelta(eta)
+            spd_str = humanize.naturalsize(dlspeed, binary=True) + "/s"
+            bar = "▓" * int(pct // 5) + "░" * (20 - int(pct // 5))
+
+            desc = (
+                f"**State:** {state}\n"
+                f"**Size:** {humanize.naturalsize(size, binary=True)}\n"
+                f"**Downloaded:** {humanize.naturalsize(downloaded, binary=True)} "
+                f"({pct:.1f}%)\n"
+                f"**ETA:** {eta_str}\n\n"
+                f"Progress: **{bar}** ~{spd_str}"
+            )
+            progress_embed.description = desc
+            progress_embed.set_footer(text=f"Seeds: {seeds} • Peers: {leeches}")
+            await msg.edit(embed=progress_embed)
+
+            if pct >= 99 or state.lower() in ("seeding", "uploading"):
+                done = discord.Embed(
+                    title="🎉 Download Complete",
+                    description=f"{humanize.naturalsize(size, binary=True)} finished.",
+                    color=discord.Color.green()
+                )
+                await msg.delete()
+                await channel.send(embed=done)
+                break
+
+            await asyncio.sleep(5)
+
+    except Exception as e:
+        logger.error("Progress error: %s", e)
+        await channel.send(embed=discord.Embed(
+            title="Error",
+            description=str(e),
+            color=discord.Color.red()
+        ))
 
 # -------- COMMANDS -------- #
 
 @bot.slash_command(name="search", description="Search for torrents.", guild_ids=guild_ids)
-async def search(ctx: ApplicationContext, query: Option(str, "Specify the search query.", required=True)):  # type: ignore
-    logger.info("Received search request with query: %s", query)
-    embed = discord.Embed(title="Search Initiated", description="Searching...", color=discord.Color.blue())
-    await ctx.respond(embed=embed, ephemeral=True)
+async def search(ctx: ApplicationContext, query: Option(str, "Specify the search query.", required=True)):
+    logger.info("Search query: %s", query)
+    await ctx.respond(embed=discord.Embed(title="Searching...", color=discord.Color.blue()), ephemeral=True)
 
     try:
-        response = requests.get(f"{API_URL}/torrents?q={query}", timeout=10)
-        results = response.json()
+        r = requests.get(f"{API_URL}/torrents?q={query}", timeout=10)
+        results = r.json()
 
         if not results:
             await ctx.send(embed=discord.Embed(
                 title="No Results Found",
-                description="Try another query.",
+                description="Try another search.",
                 color=discord.Color.orange()
             ))
             return
 
-        # ⚠️ Upstream warning message
-        warning_embed = discord.Embed(
-            title="⚠️ /Search Provider Notice",
-            description=(
-                "Results are currently fetched from **https://www.1377x.to**.\n"
-                "They may not always work very well or could include wack results.\n"
-                "Use /magnet for way more control"
-            ),
+        notice = discord.Embed(
+            title="⚠️ Provider Notice",
+            description="Results come from **1377x.to**; use /magnet for direct control.",
             color=discord.Color.gold()
         )
-        await ctx.send(embed=warning_embed)
+        await ctx.send(embed=notice)
 
-        for i, r in enumerate(results[:len(emoji_list)]):
-            e = discord.Embed(title=r["title"], color=discord.Color.blue())
-            e.add_field(name="Size", value=r["size"], inline=False)
-            e.add_field(name="Seeders", value=r["seeders"], inline=False)
-            e.add_field(name="Leechers", value=r["leechers"], inline=False)
-            e.add_field(name="Date", value=r["date"], inline=False)
-            e.add_field(name="Magnet Link", value=f"```{r['magnet_link']}```", inline=False)
-            msg = await ctx.send(embed=e)
-            await msg.add_reaction(emoji_list[i])
-        logger.info("Search results displayed successfully.")
+        for i, res in enumerate(results[:len(emoji_list)]):
+            e = discord.Embed(title=res["title"], color=discord.Color.blurple())
+            e.add_field(name="Size", value=res["size"], inline=True)
+            e.add_field(name="Seeders", value=res["seeders"], inline=True)
+            e.add_field(name="Leechers", value=res["leechers"], inline=True)
+            e.add_field(name="Date", value=res["date"], inline=True)
+            e.add_field(name="Magnet Link", value=f"```{res['magnet_link']}```", inline=False)
+            m = await ctx.send(embed=e)
+            await m.add_reaction(emoji_list[i])
 
     except Exception as e:
-        logger.error("Error during search: %s", e)
+        logger.error("Search error: %s", e)
         await ctx.send(embed=discord.Embed(title="Error", description=str(e), color=discord.Color.red()))
 
 
 @bot.slash_command(name="magnet", description="Add a magnet link to qBittorrent.", guild_ids=guild_ids)
 async def magnet(ctx: ApplicationContext,
-                 magnet_link: Option(str, "Specify the magnet link.", required=True),  # type: ignore
-                 category: Option(str, "Specify the category.", required=True, choices=["TV", "Movie", "FitGirl Repack"])):  # type: ignore
-    logger.info("Processing magnet: %s", magnet_link[:60])
-    qbit.download(magnet_link, category)
-
+                 magnet_link: Option(str, "Specify the magnet link.", required=True),
+                 category: Option(str, "Specify the category.", required=True,
+                                  choices=["TV", "Movie", "FitGirl Repack"])):
+    logger.info("Magnet received for category %s", category)
     await ctx.respond(embed=discord.Embed(
-        title="Torrent Added",
-        description=f"Magnet link sent to qBittorrent under category **{category}**.",
+        title="Magnet Accepted",
+        description=f"Added to category **{category}**. Monitoring progress...",
         color=discord.Color.green()
     ))
+    bot.loop.create_task(handle_magnet_download(ctx.channel, magnet_link, category))
 
+# -------- REACTION HANDLER -------- #
 
 @bot.event
 async def on_reaction_add(reaction, user):
-    """Handle emoji reactions from search results."""
     if user.bot:
         return
     msg = reaction.message
-    if msg.embeds and msg.author == bot.user:
-        embed = msg.embeds[0]
-        if reaction.emoji in emoji_list:
-            magnet_field = next((f for f in embed.fields if f.name == "Magnet Link"), None)
-            if magnet_field:
-                magnet = magnet_field.value.strip("```")
-                logger.info("User %s selected magnet link: %s", user.name, magnet[:60])
-                qbit.download(magnet, "Movie")
-                await msg.channel.send(embed=discord.Embed(
-                    title="Torrent Added via Reaction",
-                    description="Your selection was added to qBittorrent.",
-                    color=discord.Color.green()
-                ))
-
+    if not msg.embeds or msg.author != bot.user:
+        return
+    embed = msg.embeds[0]
+    if reaction.emoji in emoji_list:
+        magnet_field = next((f for f in embed.fields if f.name == "Magnet Link"), None)
+        if magnet_field:
+            magnet = magnet_field.value.strip("```")
+            logger.info("Reaction magnet added by %s", user.name)
+            await msg.channel.send(embed=discord.Embed(
+                title="Torrent Added via Reaction",
+                description="Added to **Movie** category. Fetching progress...",
+                color=discord.Color.green()
+            ))
+            bot.loop.create_task(handle_magnet_download(msg.channel, magnet, "Movie"))
 
 # -------- MAIN -------- #
 
 @bot.event
 async def on_ready():
-    logger.info("%s is now online and ready.", bot.user)
+    logger.info("%s is online and ready.", bot.user)
     await bot.change_presence(activity=discord.Game("Torrent Management"))
 
 if __name__ == "__main__":
     try:
         bot.run(bot_token)
     except Exception as e:
-        logger.error("Discord bot encountered an error: %s", e)
+        logger.error("Startup error: %s", e)
         sys.exit(1)
 else:
     try:
         bot.run(bot_token)
     except Exception as e:
-        logger.error("Discord bot encountered an error under gunicorn: %s", e)
+        logger.error("Gunicorn error: %s", e)
         sys.exit(1)
