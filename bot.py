@@ -20,6 +20,7 @@ import configparser
 import asyncio
 import humanize
 import logging
+from urllib.parse import parse_qsl, urlencode
 from requests.exceptions import ConnectionError
 from qbittorrent.client import LoginRequired
 
@@ -46,10 +47,41 @@ except Exception as e:
     logger.error("Configuration error: %s", e)
     sys.exit(1)
 
+# -------- MAGNET TRIMMER -------- #
+
+def trim_magnet(magnet_link: str, max_trackers: int = 7, max_len: int = 1024) -> str:
+    """
+    Safely trims magnet links for Discord embeds:
+    - Keeps only top `max_trackers` trackers.
+    - Ensures final string is <= max_len characters.
+    """
+    if not magnet_link.startswith("magnet:?"):
+        return magnet_link
+
+    try:
+        # Parse magnet query params
+        base, query = magnet_link.split("?", 1)
+        params = parse_qsl(query)
+
+        infohash_part = [p for p in params if p[0] in ("xt", "dn")]
+        trackers = [p for p in params if p[0] == "tr"]
+        others = [p for p in params if p[0] not in ("xt", "dn", "tr")]
+
+        limited_trackers = trackers[:max_trackers]
+        new_params = infohash_part + limited_trackers + others
+        trimmed = f"{base}?{urlencode(new_params, doseq=True)}"
+
+        if len(trimmed) > max_len:
+            trimmed = trimmed[:max_len - 3] + "..."
+
+        return trimmed
+    except Exception as e:
+        logger.warning("Failed to trim magnet link: %s", e)
+        return magnet_link[:max_len - 3] + "..."
+
 # -------- QBITTORRENT SESSION -------- #
 
 class QbitSession:
-    """Persistent cookie-based qBittorrent session."""
     def __init__(self, host, user, password):
         self.host = host.rstrip("/")
         self.user = user
@@ -119,7 +151,6 @@ API_URL = 'http://127.0.0.1:5000'
 # -------- PROGRESS HANDLER -------- #
 
 async def handle_magnet_download(channel, magnet_link, category):
-    """Handles live torrent progress embed for a given magnet link."""
     info_url = f"{API_URL}/infoglobal"
 
     try:
@@ -133,7 +164,7 @@ async def handle_magnet_download(channel, magnet_link, category):
 
         progress_embed = discord.Embed(
             title="Torrent Download in Progress",
-            description=f"Magnet: `{magnet_link[:50]}...`",
+            description=f"Magnet: `{trim_magnet(magnet_link)}`",
             color=discord.Color.blurple()
         )
         msg = await channel.send(embed=progress_embed)
@@ -229,7 +260,10 @@ async def search(ctx: ApplicationContext, query: Option(str, "Specify the search
             e.add_field(name="Seeders", value=res["seeders"], inline=True)
             e.add_field(name="Leechers", value=res["leechers"], inline=True)
             e.add_field(name="Date", value=res["date"], inline=True)
-            e.add_field(name="Magnet Link", value=f"```{res['magnet_link']}```", inline=False)
+
+            safe_magnet = trim_magnet(res["magnet_link"])
+            e.add_field(name="Magnet Link", value=f"```{safe_magnet}```", inline=False)
+
             m = await ctx.send(embed=e)
             await m.add_reaction(emoji_list[i])
 
