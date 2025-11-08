@@ -16,6 +16,7 @@ RUN apk add --no-cache \
 
 # Copy the requirements file
 COPY requirements.txt .
+COPY start.sh .
 
 # Install Python dependencies in a virtual environment
 RUN python3 -m venv /app/venv && \
